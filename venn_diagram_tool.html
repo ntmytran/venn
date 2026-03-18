@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gene Venn Diagram</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #f5f4f1;
+  --surface:  #ffffff;
+  --surface2: #f0efe9;
+  --border:   rgba(0,0,0,0.08);
+  --border2:  rgba(0,0,0,0.16);
+  --text:     #1a1a1a;
+  --text2:    #5a5a5a;
+  --text3:    #9a9a9a;
+  --accent:   #5b4de8;
+  --accent2:  #7c6af7;
+  --coral:    #e05252;
+  --r:        10px;
+  --r2:       6px;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 2rem 1.5rem 5rem;
+}
+
+header {
+  max-width: 960px;
+  margin: 0 auto 2.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+header h1 {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+header .badge {
+  font-size: 0.72rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+}
+
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* ── set inputs ── */
+.section-label {
+  font-size: 0.68rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 0.7rem;
+}
+
+.inputs-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.set-block {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.set-block:focus-within { border-color: var(--border2); }
+
+.set-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.set-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.set-name-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.set-name-hint {
+  font-size: 0.58rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.set-label-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--border2);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 700;
+  outline: none;
+  padding: 1px 2px 3px;
+  transition: border-color 0.12s;
+}
+
+.set-label-input:focus { border-bottom-color: var(--accent); }
+.set-label-input::placeholder { color: var(--text3); font-weight: 400; }
+
+.set-count {
+  font-size: 0.68rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  white-space: nowrap;
+}
+
+.gene-textarea {
+  width: 100%;
+  height: 115px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.65;
+  padding: 9px 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.gene-textarea:focus { border-color: var(--border2); }
+.gene-textarea::placeholder { color: var(--text3); }
+
+.set-controls { display: flex; gap: 5px; margin-top: 7px; }
+
+.btn-sm {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.68rem;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  border-radius: 5px;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.btn-sm:hover { background: var(--surface2); color: var(--text); }
+
+.remove-set {
+  position: absolute;
+  top: 9px; right: 9px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s;
+}
+.remove-set:hover { background: #fdeaea; color: var(--coral); border-color: var(--coral); }
+
+.add-set-btn {
+  background: var(--surface);
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+  min-height: 200px;
+  color: var(--text3);
+  font-size: 0.8rem;
+  transition: border-color 0.15s, color 0.15s;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.add-set-btn:hover { border-color: var(--accent); color: var(--accent2); }
+.add-set-btn .plus { font-size: 1.4rem; font-weight: 300; line-height: 1; }
+
+/* ── action row ── */
+.action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.btn-primary {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: var(--r2);
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+.btn-primary:hover { opacity: 0.88; }
+
+.btn-outline {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.78rem;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  border-radius: var(--r2);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.btn-outline:hover { background: var(--surface2); color: var(--text); }
+
+/* ── stats ── */
+.stat-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+.stat-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r2);
+  padding: 10px 18px;
+  flex: 1;
+  min-width: 110px;
+}
+.stat-item .sv { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.03em; }
+.stat-item .sl { font-size: 0.68rem; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
+
+/* ── diagram ── */
+#diagram-area {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: visible;
+  display: none;
+}
+#venn-svg { display: block; width: 100%; }
+
+/* ── results ── */
+#results-panel { display: none; }
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1rem;
+}
+
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.result-card-header {
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.result-card-header .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.result-card-header h3 { font-size: 0.82rem; font-weight: 700; flex: 1; }
+.result-card-header .cnt {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--text3);
+  background: var(--surface2);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.gene-list {
+  padding: 10px 12px;
+  max-height: 170px;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.gene-pill {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.67rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.gene-pill:hover { background: #eeebfc; border-color: var(--accent2); color: var(--accent); }
+
+.enrichment-links {
+  padding: 9px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.enrich-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.63rem;
+  padding: 5px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text2);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  white-space: nowrap;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.enrich-btn:hover { background: #eeebfc; color: var(--accent); border-color: var(--accent2); }
+
+/* ── gene info popup ── */
+#gene-popup {
+  position: fixed;
+  background: #fff;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+  max-width: 330px;
+  min-width: 200px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.11);
+  line-height: 1.6;
+}
+#gene-popup .gp-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+#gene-popup .gp-fullname {
+  font-size: 0.72rem;
+  color: var(--text2);
+  margin-bottom: 8px;
+  font-style: italic;
+}
+#gene-popup .gp-summary {
+  font-size: 0.75rem;
+  color: var(--text);
+  line-height: 1.68;
+}
+#gene-popup .gp-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+#gene-popup .gp-link {
+  font-size: 0.63rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid rgba(91,77,232,0.25);
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(91,77,232,0.05);
+  pointer-events: all;
+}
+#gene-popup .gp-link:hover { background: rgba(91,77,232,0.12); }
+#gene-popup .gp-source {
+  font-size: 0.6rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  margin-top: 6px;
+}
+#gene-popup .gp-spinner {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text3); font-size: 0.78rem;
+}
+
+/* ── venn tooltip ── */
+#venn-tooltip {
+  position: fixed;
+  background: #fff;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.73rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text);
+  pointer-events: none;
+  z-index: 150;
+  display: none;
+  max-width: 260px;
+  line-height: 1.7;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.09);
+}
+
+/* scrollbar */
+.gene-list::-webkit-scrollbar { width: 4px; }
+.gene-list::-webkit-scrollbar-track { background: transparent; }
+.gene-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── export / colour toolbar ─────────────────────────────────────────────── */
+#diagram-toolbar {
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border2);
+  margin: 0 2px;
+}
+
+.toolbar-label {
+  font-size: 0.66rem;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+.color-swatch:hover  { transform: scale(1.15); }
+.color-swatch.active { border-color: #1a1a1a; }
+
+.color-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.color-picker-wrap input[type=color] {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 1px;
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.export-size-input {
+  width: 52px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: var(--text);
+  outline: none;
+  text-align: center;
+}
+.export-size-input:focus { border-color: var(--accent); }
+
+.toolbar-btn {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text2);
+  border-radius: 5px;
+  padding: 4px 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.toolbar-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--accent2); }
+.meh-btn { border-style: dashed; letter-spacing: 0.02em; }
+.meh-btn:hover { border-style: solid; border-color: #f9a8d4; color: #be185d; background: #fff0f6; }
+.meh-btn:active { transform: scale(0.96) rotate(-1deg); }
+.toolbar-btn svg  { flex-shrink: 0; }
+
+/* set-colour picker rows inside the colour panel */
+#colour-rows { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.set-colour-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text2);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Gene Venn</h1>
+  <span class="badge">hover gene pills for function · click to open NCBI Gene</span>
+  <span id="db-status" style="font-size:0.7rem;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-left:auto"></span>
+
+</header>
+
+<div class="main">
+
+  <div>
+    <div class="section-label">Gene Sets — edit the name field to rename each set</div>
+    <div class="inputs-row" id="sets-container"></div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-primary" onclick="buildVenn()">Build Diagram</button>
+    <button class="btn-outline" onclick="clearAll()">Clear all</button>
+    <button class="btn-outline" onclick="loadExample()">Load example</button>
+  </div>
+
+  <div id="stats-row" class="stat-row" style="display:none"></div>
+
+  <div id="diagram-area">
+    <!-- toolbar -->
+    <div id="diagram-toolbar">
+      <!-- colour presets -->
+      <span class="toolbar-label">Colors</span>
+      <div class="toolbar-group" id="colour-rows"></div>
+      <div class="toolbar-sep"></div>
+      <!-- export PNG -->
+      <span class="toolbar-label">PNG</span>
+      <div class="toolbar-group">
+        <span class="toolbar-label" style="font-size:0.6rem">W px</span>
+        <input class="export-size-input" id="exp-w" type="number" value="4800" min="400" max="12000" step="100" title="Width in pixels — height is auto-calculated to fit content (600 dpi ≈ 4800 px wide)">
+        <span class="toolbar-label" style="font-size:0.6rem;color:var(--text3)">H auto</span>
+        <button class="toolbar-btn" onclick="downloadPNG()" title="Download PNG at specified size">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v8M5 7l3 3 3-3"/><rect x="2" y="11" width="12" height="3" rx="1.5"/>
+          </svg>
+          PNG
+        </button>
+      </div>
+      <div class="toolbar-sep"></div>
+      <!-- export CSV -->
+      <button class="toolbar-btn" onclick="downloadCSV()" title="Download gene lists as CSV">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h6M5 12h3"/>
+        </svg>
+        CSV
+      </button>
+    </div>
+    <svg id="venn-svg" viewBox="0 0 800 440" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div id="results-panel">
+    <div class="section-label" style="margin-bottom:0.8rem">Intersections &amp; Enrichment Links</div>
+    <div class="results-grid" id="results-grid"></div>
+  </div>
+
+</div>
+
+<div id="venn-tooltip"></div>
+<div id="gene-popup"></div>
+
+<script>
+// ── palette ──────────────────────────────────────────────────────────────────
+const PALETTE_DEFAULT = ['#5b4de8','#16a57b','#e05252','#d97706','#b0449a','#2563b8'];
+// userPalette is per-set; grows as sets are added
+let userPalette = [...PALETTE_DEFAULT];
+
+// Preset palettes
+const PRESETS = {
+  default:    ['#5b4de8','#16a57b','#e05252','#d97706','#b0449a','#2563b8'],
+  pastel:     ['#a78bfa','#6ee7b7','#fca5a5','#fcd34d','#f9a8d4','#93c5fd'],
+  bold:       ['#1d4ed8','#059669','#dc2626','#b45309','#7c3aed','#0369a1'],
+  earth:      ['#92400e','#065f46','#78350f','#1e3a5f','#4a044e','#1c3a1c'],
+  colorblind: ['#0077bb','#ee7733','#009988','#cc3311','#33bbee','#ee3377'],
+  grayscale:  ['#222222','#555555','#888888','#aaaaaa','#cccccc','#444444'],
+};
+
+// ── Meh randomiser ────────────────────────────────────────────────────────────
+// Curated pool of soft, readable pastels with enough hue separation to stay
+// distinguishable in a Venn. Grouped loosely by hue family so the picker can
+// enforce contrast by sampling across families.
+const PASTEL_POOL = [
+  // lavender / purple
+  '#c4b5fd','#a78bfa','#d8b4fe','#e9d5ff','#c084fc','#a855f7',
+  // teal / mint
+  '#6ee7b7','#5eead4','#99f6e4','#a7f3d0','#34d399','#2dd4bf',
+  // rose / pink
+  '#fda4af','#f9a8d4','#fbcfe8','#fecdd3','#fb7185','#f472b6',
+  // sky / blue
+  '#93c5fd','#7dd3fc','#bae6fd','#a5f3fc','#60a5fa','#38bdf8',
+  // amber / yellow
+  '#fcd34d','#fde68a','#fef08a','#fed7aa','#fbbf24','#fde047',
+  // lime / green
+  '#bbf7d0','#d9f99d','#a7f3d0','#bef264','#86efac','#4ade80',
+  // peach / coral
+  '#fdba74','#fca5a5','#fed7aa','#fecaca','#fb923c','#f87171',
+  // lilac / indigo
+  '#a5b4fc','#c7d2fe','#ddd6fe','#e0e7ff','#818cf8','#6366f1',
+];
+
+// Fisher-Yates shuffle (in-place)
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Returns n pastel colours with guaranteed perceptual contrast.
+// Strategy: split pool into hue families (8 of 6 each), pick one from each
+// family in shuffled family order, then shuffle within-family picks.
+function randomPastels(n) {
+  const familySize = 6;
+  const families   = [];
+  for (let i = 0; i < PASTEL_POOL.length; i += familySize) {
+    families.push(PASTEL_POOL.slice(i, i + familySize));
+  }
+  shuffle(families);
+  const chosen = [];
+  for (let f = 0; f < Math.min(n, families.length); f++) {
+    const fam = [...families[f]];
+    shuffle(fam);
+    chosen.push(fam[0]);
+  }
+  // If n > number of families, fill from remaining with any unused colour
+  if (chosen.length < n) {
+    const used = new Set(chosen);
+    const rest = shuffle(PASTEL_POOL.filter(c => !used.has(c)));
+    chosen.push(...rest.slice(0, n - chosen.length));
+  }
+  return chosen;
+}
+
+function meh() {
+  const n = window._lastGsets ? window._lastGsets.length : sets.length;
+  const cols = randomPastels(n);
+  setColors = {};
+  userPalette = [...cols];
+  rebuildSVGOnly();
+  buildColourRows(n);
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function getColor(i)     { return userPalette[i % userPalette.length]; }
+function getFill(i)      { return hexToRgba(getColor(i), 0.12); }
+
+// Keep per-set overrides
+let setColors = {};  // set index → hex color
+
+function effectiveColor(i) {
+  return setColors[i] !== undefined ? setColors[i] : getColor(i);
+}
+function effectiveFill(i) {
+  return hexToRgba(effectiveColor(i), 0.12);
+}
+
+// ── state ────────────────────────────────────────────────────────────────────
+let sets = [];
+const geneCache = {};
+
+function uid() { return Math.random().toString(36).slice(2,8); }
+
+// ── set management ────────────────────────────────────────────────────────────
+function createSet(name, genes) {
+  sets.push({ id: uid(), name: name || ('Set ' + (sets.length + 1)), genes: genes || '' });
+  renderSetInputs();
+}
+
+function renderSetInputs() {
+  const container = document.getElementById('sets-container');
+  container.innerHTML = '';
+
+  sets.forEach((s, i) => {
+    const color = effectiveColor(i);
+    const div = document.createElement('div');
+    div.className = 'set-block';
+    div.innerHTML = `
+      <div class="set-header">
+        <div class="set-dot" style="background:${color}"></div>
+        <div class="set-name-wrap">
+          <span class="set-name-hint">Set name</span>
+          <input class="set-label-input"
+            value="${escHtml(s.name)}"
+            placeholder="e.g. MK up, WT 24h …"
+            oninput="sets[${i}].name = this.value"
+            title="Click to rename">
+        </div>
+        <span class="set-count" id="cnt-${s.id}">${parseGenes(s.genes).length} genes</span>
+      </div>
+      <textarea class="gene-textarea"
+        placeholder="Paste gene symbols here&#10;space / comma / newline separated"
+        oninput="sets[${i}].genes = this.value; updateCount('${s.id}', this.value)"
+      >${escHtml(s.genes)}</textarea>
+      <div class="set-controls">
+        <button class="btn-sm" onclick="sortGenes(${i})">Sort</button>
+        <button class="btn-sm" onclick="dedupeGenes(${i})">Dedup</button>
+      </div>
+      ${sets.length > 2 ? `<button class="remove-set" onclick="removeSet('${s.id}')" title="Remove">✕</button>` : ''}
+    `;
+    container.appendChild(div);
+  });
+
+  if (sets.length < 6) {
+    const add = document.createElement('button');
+    add.className = 'add-set-btn';
+    add.innerHTML = '<span class="plus">+</span><span>Add Set</span>';
+    add.onclick = () => createSet();
+    container.appendChild(add);
+  }
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateCount(id, val) {
+  const el = document.getElementById('cnt-' + id);
+  if (el) el.textContent = parseGenes(val).length + ' genes';
+}
+
+function parseGenes(text) {
+  if (!text || !text.trim()) return [];
+  return [...new Set(
+    text.split(/[\s,;\t\n]+/)
+      .map(g => g.trim().toUpperCase())
+      .filter(Boolean)
+  )];
+}
+
+function sortGenes(i) {
+  const ta = document.querySelectorAll('.gene-textarea')[i];
+  const g = parseGenes(sets[i].genes).sort();
+  ta.value = g.join('\n'); sets[i].genes = ta.value;
+  updateCount(sets[i].id, ta.value);
+}
+
+function dedupeGenes(i) {
+  const ta = document.querySelectorAll('.gene-textarea')[i];
+  const g = parseGenes(sets[i].genes);
+  ta.value = g.join('\n'); sets[i].genes = ta.value;
+  updateCount(sets[i].id, ta.value);
+}
+
+function removeSet(id) {
+  sets = sets.filter(s => s.id !== id);
+  renderSetInputs();
+}
+
+function clearAll() {
+  sets.forEach((s, i) => { sets[i].genes = ''; sets[i].name = 'Set ' + (i+1); });
+  renderSetInputs();
+  ['diagram-area','results-panel','stats-row'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+function loadExample() {
+  sets = [
+    { id:uid(), name:'WT 24h',    genes:'SLFN14 MYH9 MYH10 TUBB1 GP1BA GP1BB GP9 ITGA2B ITGB3 VWF THBS1 FLI1 GATA1 TAL1 KLF1 NFE2 MEIS1 HOXA9 RUNX1 PF4 PPBP CXCL5 SELP ACTB ACTA1 TPM4 FLNA PACSIN2' },
+    { id:uid(), name:'K219N mut', genes:'SLFN14 SLFN11 MYH9 MYH11 TUBB1 GP1BA GP9 ITGA2B VWF THBS1 FLI1 GATA1 TAL1 NFE2 MEIS1 RUNX1 PF4 ACTB FLNA PLEK GRAP2 LCP2 SYK BTK PLCG2 PIK3CD VAV1 BLNK RAC1' },
+    { id:uid(), name:'V220D mut', genes:'SLFN14 MYH9 MYH10 TUBB1 GP1BA GP1BB ITGA2B ITGB3 VWF FLI1 GATA1 RUNX1 PF4 PPBP ACTB ACTA1 TPM4 FLNA THBS1 NFE2 MEIS1 GP9 SELP TRIM63 FBXO32 HSPA1A HSPB1 ATF3 DDIT3' }
+  ];
+  renderSetInputs();
+}
+
+// ── embedded gene DB (injected by build_gene_db.py) ─────────────────────────
+// Before running build_gene_db.py this is empty; after injection it becomes:
+//   const GENE_DB = { "SLFN14": { n:"...", s:"...", e:"12345" }, … }
+// Keys are uppercase gene symbols; values use short keys to minimise file size:
+//   n = full gene name, s = RefSeq summary paragraph, e = Entrez Gene ID
+</script>
+<script src="gene_db.js"></script>
+<script>
+
+// Normalised lookup map (built once at startup)
+const _DB = {};
+if (typeof GENE_DB !== 'undefined') {
+  for (const [k, v] of Object.entries(GENE_DB)) {
+    _DB[k.toUpperCase()] = v;
+  }
+  const n = Object.keys(_DB).length;
+  const el = document.getElementById('db-status');
+  if (el && n > 0) el.textContent = n.toLocaleString() + ' genes';
+}
+
+const dbLoaded = Object.keys(_DB).length > 0;
+
+function lookupGene(symbol) {
+  const rec = _DB[(symbol || '').toUpperCase()];
+  if (!rec) return null;
+  return {
+    symbol:  rec.symbol || symbol,
+    name:    rec.n || '',
+    summary: rec.s || '',
+    entrez:  rec.e || ''
+  };
+}
+
+async function fetchGeneInfo(symbol) {
+  if (Object.prototype.hasOwnProperty.call(geneCache, symbol)) return geneCache[symbol];
+  const info = lookupGene(symbol);
+  geneCache[symbol] = info;
+  return info;
+}
+function truncate(str, n) {
+  if (!str || str.length <= n) return str;
+  return str.slice(0, n).replace(/\s+\S*$/, '') + ' …';
+}
+
+// ── gene popup ────────────────────────────────────────────────────────────────
+let popupTimer = null;
+let activeGene = null;
+
+function showGenePopup(e, symbol) {
+  clearTimeout(popupTimer);
+  activeGene = symbol;
+  const popup = document.getElementById('gene-popup');
+  positionPopup(e);
+  document.addEventListener('mousemove', trackPopup);
+
+  // Lookup is now synchronous from local DB — no spinner needed
+  const info = lookupGene(symbol);
+
+  const genePageUrl = info && info.entrez
+    ? `https://www.ncbi.nlm.nih.gov/gene/${info.entrez}`
+    : `https://www.ncbi.nlm.nih.gov/gene/?term=${symbol}[sym]+AND+human[orgn]`;
+  const uniprotUrl  = `https://www.uniprot.org/uniprotkb?query=${symbol}+AND+organism_id:9606&sort=score`;
+  const omimUrl     = `https://www.omim.org/search?index=entry&search=${symbol}`;
+  const gcUrl       = `https://www.genecards.org/cgi-bin/carddisp.pl?gene=${symbol}`;
+
+  if (!dbLoaded) {
+    popup.innerHTML = `
+      <div class="gp-name">${symbol}</div>
+      <div class="gp-summary" style="color:var(--text3);font-size:0.72rem">
+        Gene DB not embedded yet.<br>
+        Run <code style="font-family:'IBM Plex Mono',monospace">build_gene_db.py</code>
+        to inject summaries into this file.
+      </div>
+      <div class="gp-links">
+        <a class="gp-link" href="${genePageUrl}" target="_blank" rel="noopener">NCBI Gene ↗</a>
+        <a class="gp-link" href="${gcUrl}" target="_blank" rel="noopener">GeneCards ↗</a>
+      </div>`;
+  } else if (!info) {
+    popup.innerHTML = `
+      <div class="gp-name">${symbol}</div>
+      <div class="gp-summary" style="color:var(--text3)">Not found in loaded gene DB.</div>
+      <div class="gp-links">
+        <a class="gp-link" href="${genePageUrl}" target="_blank" rel="noopener">NCBI Gene ↗</a>
+        <a class="gp-link" href="${gcUrl}" target="_blank" rel="noopener">GeneCards ↗</a>
+        <a class="gp-link" href="${uniprotUrl}" target="_blank" rel="noopener">UniProt ↗</a>
+      </div>`;
+  } else {
+    popup.innerHTML = `
+      <div class="gp-name">${info.symbol || symbol}</div>
+      ${info.name ? `<div class="gp-fullname">${info.name}</div>` : ''}
+      <div class="gp-summary">${info.summary || '<span style="color:var(--text3)">No summary on record.</span>'}</div>
+      <div class="gp-links">
+        <a class="gp-link" href="${genePageUrl}" target="_blank" rel="noopener">NCBI Gene ↗</a>
+        <a class="gp-link" href="${gcUrl}" target="_blank" rel="noopener">GeneCards ↗</a>
+        <a class="gp-link" href="${uniprotUrl}" target="_blank" rel="noopener">UniProt ↗</a>
+        <a class="gp-link" href="${omimUrl}" target="_blank" rel="noopener">OMIM ↗</a>
+      </div>
+      <div class="gp-source">Source: NCBI Gene (embedded DB)</div>`;
+  }
+  popup.style.display = 'block';
+}
+
+function hideGenePopup() {
+  clearTimeout(popupTimer);
+  activeGene = null;
+  document.getElementById('gene-popup').style.display = 'none';
+  document.removeEventListener('mousemove', trackPopup);
+}
+
+function trackPopup(e) { positionPopup(e); }
+
+function positionPopup(e) {
+  const popup = document.getElementById('gene-popup');
+  const pw = popup.offsetWidth  || 330;
+  const ph = popup.offsetHeight || 150;
+  let x = e.clientX + 16, y = e.clientY + 14;
+  if (x + pw > window.innerWidth  - 8) x = e.clientX - pw - 10;
+  if (y + ph > window.innerHeight - 8) y = e.clientY - ph - 10;
+  popup.style.left = x + 'px';
+  popup.style.top  = y + 'px';
+}
+
+// ── venn drawing ──────────────────────────────────────────────────────────────
+function getGeneSets() {
+  return sets.map(s => ({ name: s.name, genes: new Set(parseGenes(s.genes)) }));
+}
+
+function powerset(arr) {
+  const res = [];
+  for (let i = 1; i < (1 << arr.length); i++) {
+    const sub = [];
+    for (let j = 0; j < arr.length; j++) if (i & (1 << j)) sub.push(j);
+    res.push(sub);
+  }
+  return res;
+}
+
+function getExclusive(gsets, indices) {
+  if (!indices.length) return new Set();
+  const inter = new Set([...gsets[indices[0]].genes].filter(g =>
+    indices.every(i => gsets[i].genes.has(g))
+  ));
+  const others = gsets.filter((_, i) => !indices.includes(i)).map(s => s.genes);
+  return new Set([...inter].filter(g => others.every(s => !s.has(g))));
+}
+
+function getAllRegions(gsets) {
+  return powerset(gsets.map((_, i) => i))
+    .map(indices => ({
+      indices,
+      label: indices.map(i => gsets[i].name).join(' ∩ '),
+      genes: getExclusive(gsets, indices)
+    }))
+    .filter(r => r.genes.size > 0);
+}
+
+function buildVenn() {
+  const gsets = getGeneSets();
+  if (gsets.some(s => s.genes.size === 0)) {
+    alert('Please enter at least one gene in every set.'); return;
+  }
+
+  const n = gsets.length;
+  const regions = getAllRegions(gsets);
+  const svg = document.getElementById('venn-svg');
+  svg.innerHTML = '';
+
+  const W = 800;
+  const H = n <= 2 ? 440 : n === 3 ? 500 : n <= 5 ? 480 : 500;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const layouts = {
+    2: [{x:285,y:218},{x:515,y:218}],
+    3: [{x:318,y:175},{x:482,y:175},{x:400,y:312}],
+    4: [{x:278,y:192},{x:448,y:192},{x:258,y:312},{x:478,y:312}],
+    5: [{x:310,y:163},{x:462,y:163},{x:248,y:285},{x:400,y:345},{x:532,y:285}],
+    6: [{x:290,y:157},{x:434,y:157},{x:558,y:245},{x:494,y:345},{x:310,y:345},{x:234,y:245}]
+  };
+  const radii = {2:134,3:120,4:110,5:93,6:83};
+  const pos = layouts[Math.min(n,6)] || layouts[3];
+  const r   = radii[Math.min(n,6)]   || 100;
+
+  const cx0 = pos.reduce((a,p) => a + p.x, 0) / pos.length;
+  const cy0 = pos.reduce((a,p) => a + p.y, 0) / pos.length;
+
+  // circles
+  gsets.forEach((s, i) => {
+    const {x, y} = pos[i];
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', r);
+    c.setAttribute('fill',   effectiveFill(i));
+    c.setAttribute('stroke', effectiveColor(i));
+    c.setAttribute('stroke-width', '1.5');
+    svg.appendChild(c);
+  });
+
+  // set labels
+  gsets.forEach((s, i) => {
+    const {x, y} = pos[i];
+    const color = effectiveColor(i);
+    const dx = x - cx0, dy = y - cy0, dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const lx = x + (dx/dist) * (r + 26);
+    const ly = y + (dy/dist) * (r + 14);
+    const anchor = dx > 6 ? 'start' : dx < -6 ? 'end' : 'middle';
+
+    svg.appendChild(mkT(lx, ly,      s.name,              color,   '13.5', '700', anchor));
+    svg.appendChild(mkT(lx, ly + 17, s.genes.size+' genes','#aaa', '10',   '400', anchor));
+  });
+
+  // region count labels
+  regions.forEach(reg => {
+    const rcx = reg.indices.reduce((a,i) => a + pos[i].x, 0) / reg.indices.length;
+    const rcy = reg.indices.reduce((a,i) => a + pos[i].y, 0) / reg.indices.length;
+
+    if (reg.indices.length > 1) {
+      const t = mkT(rcx, rcy, String(reg.genes.size), '#1a1a1a', '18', '700', 'middle');
+      t.style.cursor = 'pointer';
+      t.addEventListener('mouseenter', e => showVennTip(e, reg));
+      t.addEventListener('mouseleave', hideVennTip);
+      t.addEventListener('click', () => scrollToResult(reg.label));
+      svg.appendChild(t);
+    } else {
+      const i = reg.indices[0];
+      const {x, y} = pos[i];
+      const dx = x - cx0, dy = y - cy0, dist = Math.sqrt(dx*dx+dy*dy)||1;
+      const ex = x + (dx/dist) * (r * 0.44);
+      const ey = y + (dy/dist) * (r * 0.34);
+      svg.appendChild(mkT(ex, ey, String(reg.genes.size), '#777', '16', '600', 'middle'));
+    }
+  });
+
+  document.getElementById('diagram-area').style.display = 'block';
+  document.getElementById('diagram-toolbar').style.display = 'flex';
+  buildColourRows(gsets.length);
+
+  // store last-built state for export
+  window._lastRegions = regions;
+  window._lastGsets   = gsets;
+
+  // stats bar
+  const allGenes  = new Set(gsets.flatMap(s => [...s.genes]));
+  const sharedAll = [...gsets[0].genes].filter(g => gsets.every(s => s.genes.has(g)));
+  const statsEl   = document.getElementById('stats-row');
+  statsEl.style.display = 'flex';
+  statsEl.innerHTML = `
+    <div class="stat-item"><div class="sv">${allGenes.size}</div><div class="sl">total unique genes</div></div>
+    <div class="stat-item"><div class="sv">${sharedAll.length}</div><div class="sl">shared across all sets</div></div>
+    <div class="stat-item"><div class="sv">${regions.filter(r=>r.indices.length>1).length}</div><div class="sl">intersection regions</div></div>`;
+
+  renderResults(gsets, regions);
+}
+
+function mkT(x, y, txt, fill, size, weight, anchor) {
+  const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x', x); t.setAttribute('y', y);
+  t.setAttribute('text-anchor', anchor || 'middle');
+  t.setAttribute('dominant-baseline', 'central');
+  t.setAttribute('fill', fill);
+  t.setAttribute('font-family', "'IBM Plex Mono', monospace");
+  t.setAttribute('font-size',   size   || '12');
+  t.setAttribute('font-weight', weight || '400');
+  t.textContent = txt;
+  return t;
+}
+
+// ── venn tooltip ──────────────────────────────────────────────────────────────
+function showVennTip(e, reg) {
+  const tt = document.getElementById('venn-tooltip');
+  const genes   = [...reg.genes].sort();
+  const preview = genes.slice(0,12).join(', ') + (genes.length > 12 ? ` +${genes.length-12} more` : '');
+  tt.innerHTML = `
+    <div style="color:${effectiveColor(0)};font-weight:600;margin-bottom:4px">${reg.label}</div>
+    <div style="color:#5a5a5a">${reg.genes.size} genes</div>
+    <div style="color:#bbb;margin-top:4px;font-size:0.63rem">${preview}</div>
+    <div style="color:#ddd;margin-top:5px;font-size:0.6rem">click to jump to results ↓</div>`;
+  tt.style.display = 'block';
+  mvTip(e);
+  document.addEventListener('mousemove', mvTip);
+}
+function mvTip(e) {
+  const tt = document.getElementById('venn-tooltip');
+  tt.style.left = (e.clientX + 14) + 'px';
+  tt.style.top  = (e.clientY - 10) + 'px';
+}
+function hideVennTip() {
+  document.getElementById('venn-tooltip').style.display = 'none';
+  document.removeEventListener('mousemove', mvTip);
+}
+
+// ── results ───────────────────────────────────────────────────────────────────
+function buildEnrichUrls(genes) {
+  const arr  = [...genes].sort();
+  const pct  = arr.join('%0d');
+  const plus = arr.join('+');
+  const comm = arr.join('%2C');
+  return {
+    string:   `https://string-db.org/cgi/network?species=9606&identifiers=${pct}`,
+    reactome: `https://reactome.org/PathwayBrowser/#TOOL=AT&SPECIES=9606&GENE=${comm}`,
+    go:       `https://biit.cs.ut.ee/gprofiler/gost?organism=hsapiens&query=${plus}`,
+    kegg:     `https://www.genome.jp/kegg/mapper/search.html?mode=1&session=&genes=hsa:${plus}`
+  };
+}
+
+function scrollToResult(label) {
+  const el = document.getElementById('result-' + label.replace(/[^a-z0-9]/gi,'_'));
+  if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+// Mix two hex colours at a given ratio (0=a, 1=b)
+function mixHex(a, b, t) {
+  const parse = (h,o) => parseInt(h.slice(o,o+2),16);
+  const r = Math.round(parse(a,1)*(1-t)+parse(b,1)*t);
+  const g = Math.round(parse(a,3)*(1-t)+parse(b,3)*t);
+  const bl = Math.round(parse(a,5)*(1-t)+parse(b,5)*t);
+  return '#'+[r,g,bl].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+function interColor(indices) {
+  let col = effectiveColor(indices[0]);
+  for (let k = 1; k < indices.length; k++)
+    col = mixHex(col, effectiveColor(indices[k]), 1/(k+1));
+  return col;
+}
+
+function renderResults(gsets, regions) {
+  const grid = document.getElementById('results-grid');
+  grid.innerHTML = '';
+
+  const sorted = [...regions].sort((a,b) =>
+    b.indices.length - a.indices.length || b.genes.size - a.genes.size
+  );
+
+  let lastDepth = -1;
+
+  sorted.forEach(reg => {
+    if (!reg.genes.size) return;
+    const depth   = reg.indices.length;
+    const isInter = depth > 1;
+
+    // Section header when depth tier changes
+    if (depth !== lastDepth) {
+      lastDepth = depth;
+      const hdr = document.createElement('div');
+      hdr.style.cssText = 'grid-column:1/-1;padding:6px 2px 2px;display:flex;align-items:center;gap:8px';
+      const label = depth === gsets.length && depth > 1
+        ? `Shared by all ${depth} sets`
+        : depth > 1
+          ? `Shared by ${depth} sets`
+          : 'Unique to one set';
+      hdr.innerHTML = `
+        <span style="font-size:0.68rem;font-family:'IBM Plex Mono',monospace;
+          text-transform:uppercase;letter-spacing:0.08em;color:var(--text3)">${label}</span>
+        <span style="flex:1;height:1px;background:var(--border)"></span>`;
+      grid.appendChild(hdr);
+    }
+
+    const color = interColor(reg.indices);
+    const urls  = buildEnrichUrls(reg.genes);
+    const genes = [...reg.genes].sort();
+
+    const card = document.createElement('div');
+    card.className = 'result-card';
+    if (depth === gsets.length && depth > 1)
+      card.style.borderLeft = '3px solid ' + color;
+    card.id = 'result-' + reg.label.replace(/[^a-z0-9]/gi,'_');
+
+    const pillsHtml = genes.map(g => {
+      const gs = g.replace(/'/g, "\'");
+      return `<span class="gene-pill"
+        onmouseenter="showGenePopup(event,'${gs}')"
+        onmouseleave="hideGenePopup()"
+        onclick="window.open('https://www.ncbi.nlm.nih.gov/gene/?term=${gs}[sym]+AND+human[orgn]','_blank')"
+        title="Hover: function · Click: NCBI Gene"
+      >${g}</span>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="result-card-header">
+        <div class="dot" style="background:${color}"></div>
+        <h3 style="color:${isInter ? color : 'var(--text)'}">${reg.label}</h3>
+        <span class="cnt">${reg.genes.size}</span>
+      </div>
+      <div class="gene-list">${pillsHtml}</div>
+      <div class="enrichment-links">
+        <a class="enrich-btn" href="${urls.string}"   target="_blank" rel="noopener">STRING-db</a>
+        <a class="enrich-btn" href="${urls.reactome}" target="_blank" rel="noopener">Reactome</a>
+        <a class="enrich-btn" href="${urls.go}"       target="_blank" rel="noopener">g:Profiler (GO)</a>
+        <a class="enrich-btn" href="${urls.kegg}"     target="_blank" rel="noopener">KEGG</a>
+        <button class="enrich-btn" onclick="copyGenes(this,'${genes.join(',')}')">&#8984; Copy</button>
+      </div>`;
+
+    grid.appendChild(card);
+  });
+
+  document.getElementById('results-panel').style.display = 'block';
+}
+
+
+function copyGenes(btn, geneStr) {
+  navigator.clipboard.writeText(geneStr.replace(/,/g,'\n')).then(() => {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ Copied!';
+    setTimeout(() => btn.innerHTML = orig, 1600);
+  });
+}
+
+
+// ── colour picker ──────────────────────────────────────────────────────────────
+function buildColourRows(n) {
+  const wrap = document.getElementById('colour-rows');
+  wrap.innerHTML = '';
+
+  // Preset buttons
+  const presetWrap = document.createElement('div');
+  presetWrap.className = 'toolbar-group';
+  presetWrap.style.gap = '4px';
+  Object.entries(PRESETS).forEach(([key, cols]) => {
+    const btn = document.createElement('button');
+    btn.className = 'toolbar-btn';
+    btn.style.cssText = 'padding:3px 8px;font-size:0.65rem;gap:4px';
+    // Mini swatch strip
+    const strip = cols.slice(0, Math.min(n,4)).map(c =>
+      `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c}"></span>`
+    ).join('');
+    btn.innerHTML = strip + ' ' + key;
+    btn.title = 'Apply ' + key + ' palette';
+    btn.onclick = () => applyPreset(cols, n);
+    presetWrap.appendChild(btn);
+  });
+  // Meh button — randomise contrasting pastels
+  const mehBtn = document.createElement('button');
+  mehBtn.className = 'toolbar-btn meh-btn';
+  mehBtn.title = 'Randomise a set of contrasting pastel colours';
+  mehBtn.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 8a6 6 0 1 0 12 0"/>
+      <path d="M11 5l3 3-3 3"/>
+    </svg>
+    Meh`;
+  mehBtn.onclick = meh;
+  presetWrap.appendChild(mehBtn);
+  wrap.appendChild(presetWrap);
+
+  // Per-set custom colour pickers
+  const sep = document.createElement('div');
+  sep.className = 'toolbar-sep';
+  wrap.appendChild(sep);
+
+  for (let i = 0; i < n; i++) {
+    const row = document.createElement('div');
+    row.className = 'set-colour-row';
+    const col = effectiveColor(i);
+    row.innerHTML = `
+      <span style="color:${col};font-weight:600">${window._lastGsets ? window._lastGsets[i].name : 'Set '+(i+1)}</span>
+      <input type="color" value="${col}" data-idx="${i}"
+        oninput="setColour(${i}, this.value)"
+        style="width:22px;height:22px;border:1px solid var(--border2);border-radius:4px;
+               padding:1px;cursor:pointer;background:var(--surface)">`;
+    wrap.appendChild(row);
+  }
+}
+
+function applyPreset(cols, n) {
+  setColors = {};
+  userPalette = [...cols];
+  // re-render without rebuilding gene logic
+  rebuildSVGOnly();
+  buildColourRows(n);
+}
+
+function setColour(idx, hex) {
+  setColors[idx] = hex;
+  rebuildSVGOnly();
+}
+
+function rebuildSVGOnly() {
+  if (!window._lastGsets || !window._lastRegions) return;
+  // Re-run just the SVG drawing part of buildVenn
+  const gsets   = window._lastGsets;
+  const regions  = window._lastRegions;
+  const n        = gsets.length;
+  const svg      = document.getElementById('venn-svg');
+  svg.innerHTML  = '';
+
+  const layouts = {
+    2:[{x:285,y:218},{x:515,y:218}],
+    3:[{x:318,y:180},{x:482,y:180},{x:400,y:322}],
+    4:[{x:278,y:192},{x:448,y:192},{x:258,y:312},{x:478,y:312}],
+    5:[{x:310,y:163},{x:462,y:163},{x:248,y:285},{x:400,y:345},{x:532,y:285}],
+    6:[{x:290,y:157},{x:434,y:157},{x:558,y:245},{x:494,y:345},{x:310,y:345},{x:234,y:245}]
+  };
+  const radii = {2:134,3:120,4:110,5:93,6:83};
+  const pos = layouts[Math.min(n,6)] || layouts[3];
+  const r   = radii[Math.min(n,6)]   || 100;
+  const cx0 = pos.reduce((a,p)=>a+p.x,0)/pos.length;
+  const cy0 = pos.reduce((a,p)=>a+p.y,0)/pos.length;
+
+  gsets.forEach((s, i) => {
+    const {x,y} = pos[i];
+    const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',r);
+    c.setAttribute('fill', effectiveFill(i));
+    c.setAttribute('stroke', effectiveColor(i));
+    c.setAttribute('stroke-width','1.5');
+    svg.appendChild(c);
+  });
+
+  gsets.forEach((s,i) => {
+    const {x,y} = pos[i];
+    const color = effectiveColor(i);
+    const dx=x-cx0, dy=y-cy0, dist=Math.sqrt(dx*dx+dy*dy)||1;
+    const lx = x+(dx/dist)*(r+26);
+    const ly = y+(dy/dist)*(r+14);
+    const anchor = dx>6?'start':dx<-6?'end':'middle';
+    svg.appendChild(mkT(lx, ly,      s.name,              color, '13.5','700',anchor));
+    svg.appendChild(mkT(lx, ly+17,   s.genes.size+' genes','#aaa','10', '400',anchor));
+  });
+
+  regions.forEach(reg => {
+    const rcx = reg.indices.reduce((a,i)=>a+pos[i].x,0)/reg.indices.length;
+    const rcy = reg.indices.reduce((a,i)=>a+pos[i].y,0)/reg.indices.length;
+    if (reg.indices.length > 1) {
+      const t = mkT(rcx,rcy,String(reg.genes.size),'#1a1a1a','18','700','middle');
+      t.style.cursor = 'pointer';
+      t.addEventListener('mouseenter', e => showVennTip(e,reg));
+      t.addEventListener('mouseleave', hideVennTip);
+      t.addEventListener('click', () => scrollToResult(reg.label));
+      svg.appendChild(t);
+    } else {
+      const i = reg.indices[0];
+      const {x,y} = pos[i];
+      const dx=x-cx0, dy=y-cy0, dist=Math.sqrt(dx*dx+dy*dy)||1;
+      svg.appendChild(mkT(x+(dx/dist)*(r*0.44), y+(dy/dist)*(r*0.34),
+                          String(reg.genes.size),'#777','16','600','middle'));
+    }
+  });
+
+  // Also refresh result card dot/header colours
+  if (window._lastRegions) renderResults(gsets, regions);
+}
+
+// ── PNG export ─────────────────────────────────────────────────────────────────
+function downloadPNG() {
+  const svg  = document.getElementById('venn-svg');
+  const expW = parseInt(document.getElementById('exp-w').value) || 4800;
+
+  // Compute tight bounding box from all drawn elements
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  svg.querySelectorAll('circle, text, rect, path, line, ellipse').forEach(el => {
+    try {
+      const b = el.getBBox();
+      if (b.width === 0 && b.height === 0) return;
+      minX = Math.min(minX, b.x);
+      minY = Math.min(minY, b.y);
+      maxX = Math.max(maxX, b.x + b.width);
+      maxY = Math.max(maxY, b.y + b.height);
+    } catch(_) {}
+  });
+
+  // Fallback to full viewBox if getBBox fails
+  const vb = svg.viewBox.baseVal;
+  if (!isFinite(minX)) { minX=vb.x; minY=vb.y; maxX=vb.x+vb.width; maxY=vb.y+vb.height; }
+
+  // 3% padding on each side
+  const pad = (maxX - minX) * 0.03;
+  const cX  = minX - pad,  cY = minY - pad;
+  const cW  = (maxX - minX) + pad * 2;
+  const cH  = (maxY - minY) + pad * 2;
+  const expH = Math.round(expW * cH / cW);
+
+  // Clone with tight viewBox
+  const clone = svg.cloneNode(true);
+  clone.setAttribute('viewBox', `${cX} ${cY} ${cW} ${cH}`);
+  clone.setAttribute('width',  expW);
+  clone.setAttribute('height', expH);
+
+  const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  bg.setAttribute('x', cX); bg.setAttribute('y', cY);
+  bg.setAttribute('width', cW); bg.setAttribute('height', cH);
+  bg.setAttribute('fill','white');
+  clone.insertBefore(bg, clone.firstChild);
+
+  const svgStr  = new XMLSerializer().serializeToString(clone);
+  const svgBlob = new Blob([svgStr], {type:'image/svg+xml;charset=utf-8'});
+  const url     = URL.createObjectURL(svgBlob);
+
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width  = expW;
+    canvas.height = expH;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, expW, expH);
+    ctx.drawImage(img, 0, 0, expW, expH);
+    URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.download = 'venn_diagram.png';
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  };
+  img.src = url;
+}
+
+// ── CSV export ─────────────────────────────────────────────────────────────────
+function downloadCSV() {
+  if (!window._lastRegions || !window._lastGsets) {
+    alert('Build the diagram first.'); return;
+  }
+  const regions = window._lastRegions;
+  const sorted  = [...regions].sort((a,b) =>
+    b.indices.length - a.indices.length || b.genes.size - a.genes.size
+  );
+
+  // Build CSV: one column per region, genes as rows
+  // Header: region labels
+  const headers = sorted.map(r => '"' + r.label.replace(/"/g,'""') + ' (n=' + r.genes.size + ')"');
+  const cols    = sorted.map(r => [...r.genes].sort());
+  const maxLen  = Math.max(...cols.map(c => c.length));
+
+  const rows = [headers.join(',')];
+  for (let i = 0; i < maxLen; i++) {
+    rows.push(cols.map(c => c[i] ? '"' + c[i] + '"' : '').join(','));
+  }
+
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const a    = document.createElement('a');
+  a.download = 'venn_gene_lists.csv';
+  a.href     = URL.createObjectURL(blob);
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── spinner keyframe (injected) ──────────────────────────────────────────────
+const style = document.createElement('style');
+style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+document.head.appendChild(style);
+
+// ── init ──────────────────────────────────────────────────────────────────────
+createSet('Set 1', '');
+createSet('Set 2', '');
+</script>
+</body>
+</html>
