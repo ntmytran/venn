@@ -833,15 +833,9 @@ function loadExample() {
 
 // ── embedded gene DB (injected by build_gene_db.py) ─────────────────────────
 // Before running build_gene_db.py this is empty; after injection it becomes:
-//   const GENE_DB = { "SLFN14": { n:"...", s:"...", e:"12345" }, … }
-// Keys are uppercase gene symbols; values use short keys to minimise file size:
-//   n = full gene name, s = RefSeq summary paragraph, e = Entrez Gene ID
-</script>
+//   </script>
 <script src="gene_db.js"></script>
 <script>
-
-// Normalised lookup map (built once at startup)
-const _DB = {};
 if (typeof GENE_DB !== 'undefined') {
   for (const [k, v] of Object.entries(GENE_DB)) {
     _DB[k.toUpperCase()] = v;
