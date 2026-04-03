@@ -817,6 +817,7 @@ function removeSet(id) {
 function clearAll() {
   sets.forEach((s, i) => { sets[i].genes = ''; sets[i].name = 'Set ' + (i+1); });
   renderSetInputs();
+  window._isUpset = false;
   ['diagram-area','results-panel','stats-row'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
@@ -1099,11 +1100,18 @@ function buildVenn() {
 
   const n = gsets.length;
   const regions = getAllRegions(gsets);
+
+  // 4+ sets → UpSet plot (circles can't show all regions correctly)
+  if (n >= 4) {
+    buildUpset(gsets, regions);
+    return;
+  }
+
   const svg = document.getElementById('venn-svg');
   svg.innerHTML = '';
 
   const W = 800;
-  const H = n <= 2 ? 420 : n === 3 ? 510 : n === 4 ? 470 : n <= 5 ? 510 : 510;
+  const H = n <= 2 ? 420 : 510;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
   const layouts = {
@@ -1181,6 +1189,208 @@ function buildVenn() {
   renderResults(gsets, regions);
 }
 
+
+// ── UpSet plot renderer ────────────────────────────────────────────────────────
+function buildUpset(gsets, regions) {
+  const n      = gsets.length;
+  const svg    = document.getElementById('venn-svg');
+  svg.innerHTML = '';
+
+  // Layout constants
+  const W       = 900;
+  const BAR_H   = 220;   // top bar chart height
+  const MAT_ROW = 28;    // height per set row in the matrix
+  const MAT_H   = n * MAT_ROW;
+  const SET_H   = 110;   // bottom horizontal set-size bars
+  const PAD_L   = 130;   // left margin (set names)
+  const PAD_R   = 20;
+  const PAD_TOP = 30;
+  const COL_GAP = 2;
+  const H       = PAD_TOP + BAR_H + MAT_H + SET_H + 40;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  // Sort regions: all-set first, then by descending depth, then by size
+  const sorted = [...regions].sort((a,b) =>
+    b.indices.length - a.indices.length || b.genes.size - a.genes.size
+  );
+
+  const nCols  = sorted.length;
+  const colW   = Math.max(22, Math.floor((W - PAD_L - PAD_R) / nCols));
+  const usedW  = colW * nCols;
+
+  // Max bar height for scaling
+  const maxCount = Math.max(...sorted.map(r => r.genes.size), 1);
+
+  // ── Column group helper ───────────────────────────────────────────────────
+  function colX(ci) { return PAD_L + ci * colW + colW / 2; }
+
+  // ── Background bands (alternating column tint) ────────────────────────────
+  sorted.forEach((reg, ci) => {
+    if (ci % 2 === 0) return;
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',  PAD_L + ci * colW);
+    rect.setAttribute('y',  PAD_TOP);
+    rect.setAttribute('width',  colW);
+    rect.setAttribute('height', BAR_H + MAT_H);
+    rect.setAttribute('fill', 'rgba(0,0,0,0.025)');
+    svg.appendChild(rect);
+  });
+
+  // ── Top bar chart (intersection sizes) ───────────────────────────────────
+  const barAreaY = PAD_TOP;
+
+  // Y-axis ticks
+  const nTicks = 4;
+  for (let t = 0; t <= nTicks; t++) {
+    const val  = Math.round(maxCount * t / nTicks);
+    const ty   = barAreaY + BAR_H - (BAR_H * t / nTicks);
+    const tick = document.createElementNS('http://www.w3.org/2000/svg','line');
+    tick.setAttribute('x1', PAD_L - 4); tick.setAttribute('x2', PAD_L + usedW);
+    tick.setAttribute('y1', ty); tick.setAttribute('y2', ty);
+    tick.setAttribute('stroke', t === 0 ? '#ccc' : '#e8e6e0');
+    tick.setAttribute('stroke-width', t === 0 ? '1' : '0.5');
+    svg.appendChild(tick);
+    svg.appendChild(mkT(PAD_L - 8, ty, String(val), '#aaa', '9', '400', 'end'));
+  }
+
+  // Y-axis label
+  const yLabel = mkT(12, barAreaY + BAR_H/2, 'Intersection size', '#888', '9.5', '400', 'middle');
+  yLabel.setAttribute('transform', `rotate(-90, 12, ${barAreaY + BAR_H/2})`);
+  svg.appendChild(yLabel);
+
+  // Bars
+  sorted.forEach((reg, ci) => {
+    const barH  = (reg.genes.size / maxCount) * BAR_H;
+    const bx    = PAD_L + ci * colW + COL_GAP;
+    const bw    = colW - COL_GAP * 2;
+    const by    = barAreaY + BAR_H - barH;
+    const color = interColor(reg.indices).replace('#','');
+    const isAll = reg.indices.length === n;
+
+    // Bar fill
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', bx); rect.setAttribute('y', by);
+    rect.setAttribute('width', bw); rect.setAttribute('height', Math.max(barH, 1));
+    rect.setAttribute('fill', '#' + color);
+    rect.setAttribute('rx', '2');
+    rect.style.cursor = 'pointer';
+    rect.addEventListener('mouseenter', e => showVennTip(e, reg));
+    rect.addEventListener('mouseleave', hideVennTip);
+    rect.addEventListener('click', () => scrollToResult(reg.label));
+    svg.appendChild(rect);
+
+    // Count label on top of bar
+    if (reg.genes.size > 0) {
+      const fontSize = colW < 28 ? '7' : '9';
+      const t = mkT(colX(ci), by - 3, String(reg.genes.size), '#333', fontSize, '600', 'middle');
+      svg.appendChild(t);
+    }
+  });
+
+  // ── Matrix (dot + line connector) ─────────────────────────────────────────
+  const matY = barAreaY + BAR_H;
+  const DOT_R = Math.min(colW * 0.28, 8);
+
+  // Set name labels (left side)
+  gsets.forEach((s, si) => {
+    const ry = matY + si * MAT_ROW + MAT_ROW / 2;
+    // Alternating row background
+    if (si % 2 === 0) {
+      const rb = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rb.setAttribute('x', 0); rb.setAttribute('y', matY + si * MAT_ROW);
+      rb.setAttribute('width', W); rb.setAttribute('height', MAT_ROW);
+      rb.setAttribute('fill', 'rgba(0,0,0,0.018)');
+      svg.appendChild(rb);
+    }
+    // Coloured name label
+    svg.appendChild(mkT(PAD_L - 10, ry, s.name, effectiveColor(si), '10', '600', 'end'));
+    // Light guide line across matrix
+    const gl = document.createElementNS('http://www.w3.org/2000/svg','line');
+    gl.setAttribute('x1', PAD_L); gl.setAttribute('x2', PAD_L + usedW);
+    gl.setAttribute('y1', ry); gl.setAttribute('y2', ry);
+    gl.setAttribute('stroke', '#e0ddd6'); gl.setAttribute('stroke-width', '0.4');
+    svg.appendChild(gl);
+  });
+
+  // Dots and connectors per column
+  sorted.forEach((reg, ci) => {
+    const cx2 = colX(ci);
+
+    gsets.forEach((s, si) => {
+      const ry   = matY + si * MAT_ROW + MAT_ROW / 2;
+      const inReg = reg.indices.includes(si);
+      const dot  = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx', cx2); dot.setAttribute('cy', ry); dot.setAttribute('r', DOT_R);
+      dot.setAttribute('fill', inReg ? ('#' + interColor(reg.indices).replace('#','')) : '#ddd');
+      dot.style.cursor = 'pointer';
+      dot.addEventListener('mouseenter', e => showVennTip(e, reg));
+      dot.addEventListener('mouseleave', hideVennTip);
+      dot.addEventListener('click', () => scrollToResult(reg.label));
+      svg.appendChild(dot);
+    });
+
+    // Vertical connector line between first and last active dot
+    if (reg.indices.length > 1) {
+      const firstY = matY + Math.min(...reg.indices) * MAT_ROW + MAT_ROW / 2;
+      const lastY  = matY + Math.max(...reg.indices) * MAT_ROW + MAT_ROW / 2;
+      const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1', cx2); ln.setAttribute('x2', cx2);
+      ln.setAttribute('y1', firstY); ln.setAttribute('y2', lastY);
+      ln.setAttribute('stroke', '#' + interColor(reg.indices).replace('#',''));
+      ln.setAttribute('stroke-width', DOT_R * 1.2);
+      ln.setAttribute('stroke-linecap', 'round');
+      svg.insertBefore(ln, svg.querySelector('circle') || null);
+    }
+  });
+
+  // ── Bottom: set size bars (horizontal) ────────────────────────────────────
+  const setBarY  = matY + MAT_H + 14;
+  const maxSetSz = Math.max(...gsets.map(s => s.genes.size), 1);
+  const maxBarW  = PAD_L - 18;
+
+  gsets.forEach((s, si) => {
+    const ry    = matY + si * MAT_ROW + MAT_ROW / 2;
+    const bw    = (s.genes.size / maxSetSz) * maxBarW;
+    const rect  = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    // Draw leftward from PAD_L
+    rect.setAttribute('x', PAD_L - bw - 2);
+    rect.setAttribute('y', ry - DOT_R * 0.9);
+    rect.setAttribute('width', bw);
+    rect.setAttribute('height', DOT_R * 1.8);
+    rect.setAttribute('fill', effectiveColor(si));
+    rect.setAttribute('opacity', '0.35');
+    rect.setAttribute('rx', '2');
+    svg.appendChild(rect);
+    // Size number
+    svg.appendChild(mkT(PAD_L - bw - 6, ry, String(s.genes.size),
+      effectiveColor(si), '8.5', '500', 'end'));
+  });
+
+  // Set-size axis label
+  svg.appendChild(mkT(PAD_L / 2, matY + MAT_H + 10, 'Set size',
+    '#aaa', '8.5', '400', 'middle'));
+
+  // ── Show diagram & trigger results ────────────────────────────────────────
+  document.getElementById('diagram-area').style.display = 'block';
+  document.getElementById('diagram-toolbar').style.display = 'flex';
+  buildColourRows(n);
+
+  window._lastRegions = regions;
+  window._lastGsets   = gsets;
+  window._isUpset     = true;
+
+  const allGenes  = new Set(gsets.flatMap(s => [...s.genes]));
+  const sharedAll = [...gsets[0].genes].filter(g => gsets.every(s => s.genes.has(g)));
+  const statsEl   = document.getElementById('stats-row');
+  statsEl.style.display = 'flex';
+  statsEl.innerHTML = `
+    <div class="stat-item"><div class="sv">${allGenes.size}</div><div class="sl">total unique genes</div></div>
+    <div class="stat-item"><div class="sv">${sharedAll.length}</div><div class="sl">shared across all sets</div></div>
+    <div class="stat-item"><div class="sv">${regions.filter(r=>r.indices.length>1).length}</div><div class="sl">intersection regions</div></div>`;
+
+  renderResults(gsets, regions);
+}
 function mkT(x, y, txt, fill, size, weight, anchor) {
   const t = document.createElementNS('http://www.w3.org/2000/svg','text');
   t.setAttribute('x', x); t.setAttribute('y', y);
@@ -1407,10 +1617,13 @@ function setColour(idx, hex) {
 
 function rebuildSVGOnly() {
   if (!window._lastGsets || !window._lastRegions) return;
-  // Re-run just the SVG drawing part of buildVenn
   const gsets   = window._lastGsets;
   const regions  = window._lastRegions;
   const n        = gsets.length;
+
+  // 4+ sets use UpSet layout
+  if (n >= 4) { buildUpset(gsets, regions); return; }
+
   const svg      = document.getElementById('venn-svg');
   svg.innerHTML  = '';
 
